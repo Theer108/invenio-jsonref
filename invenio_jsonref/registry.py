@@ -21,27 +21,33 @@
 # In applying this license, CERN does not
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
-
+import itertools
+from werkzeug.routing import Rule, Map
 
 from invenio.ext.registry import ModuleAutoDiscoverySubRegistry
-from flask.ext.registry import RegistryProxy, ModuleAutoDiscoveryRegistry, RegistryError
-
-jsonloaderext = RegistryProxy('jsonloaderext',
-                              ModuleAutoDiscoveryRegistry,
-                              'jsonloaderext')
+from flask.ext.registry import RegistryProxy
 
 
-class JsonLoaderRegistry(ModuleAutoDiscoverySubRegistry):
-
-    """Search Service Registry."""
-
-    __required_plugin_API_version__ = "Search Service Plugin API 1.0"
+class JsonLoaderRegistry(ModuleAutoDiscoverySubRegistry, Map):
+    """JsonLoader Registry."""
 
     def register(self, item):
-        service = getattr(item, item.__name__.split('.')[-1])
-        return super(JsonLoaderRegistry, self).register(service())
+        loader_class = getattr(item, 'loader')
+        assert hasattr(loader_class, '__url_map__')
 
-json_loaders = RegistryProxy('jsonloaderext.jsonloaders',
+        loader_object = loader_class()
+
+        paths, hostnames = zip(*loader_class.__url_map__)
+        url_tuples = zip(paths, [loader_object for _ in range(len(paths))], hostnames)
+        url_rules = [Rule(path, endpoint=loader_object, host=host) for path, method, host in url_tuples]
+
+
+        map(self.add, url_rules)
+
+        return super(JsonLoaderRegistry, self).register(url_rules)
+
+
+json_loaders = RegistryProxy('jsonloaderext',
                              JsonLoaderRegistry,
-                             'jsonloaders',
-                             registry_namespace=jsonloaderext)
+                             'jsonloaderext')
+

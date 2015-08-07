@@ -38,9 +38,15 @@ if site_hostname != site_secure_hostname:
     url_map += ('/record/<id>', site_secure_hostname)
 
 
-class LocalJsonLoader():
-    url_map = url_map
+class LocalRecordJsonLoader():
+    __url_map__ = url_map
 
-    def resolve(self, recid):
+    def get_remote_json(self, uri):
         from invenio_records.api import get_record
+
+        splitted_url = urlparse.urlsplit(uri)
+        recid = int(splitted_url.path.split('/')[2])
         return get_record(recid).dumps()
+
+
+loader = LocalRecordJsonLoader
